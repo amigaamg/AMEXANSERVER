@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import MetricCard from './Shared/MetricCard';
+import MetricCard from './shared/MetricCard';
 import { Users, Stethoscope, MessageSquare, Clock, Award, Heart, TrendingUp, Shield, CheckCircle, Sparkles, Target } from 'lucide-react';
 
 const ImpactMetrics = () => {

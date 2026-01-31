@@ -1,8 +1,9 @@
 'use client';
 
-import IconCard from './Shared/IconCard';
+import IconCard from './shared/IconCard';
+import Button from './shared/Button';
 import { Pill, Stethoscope, Truck, FlaskRound, Activity, Video, Bell, FileText, Sparkles, ArrowRight, CheckCircle, Zap, Shield } from 'lucide-react';
-import Button from './Shared/Button';
+
 
 const FeatureCards = () => {
   const features = [
@@ -344,3 +345,4 @@ const FeatureCards = () => {
 };
 
 export default FeatureCards;
+

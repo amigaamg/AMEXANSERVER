@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Menu, X, ChevronDown, Stethoscope, User } from 'lucide-react';
-import Button from './Shared/Button';
+import Button from './shared/Button';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);

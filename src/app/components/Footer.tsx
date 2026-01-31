@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, Heart, Shield, Clock, ArrowRight, ChevronRight, Download, Award, CheckCircle, Zap, Sparkles } from 'lucide-react';
-import Button from './Shared/Button';
+import Button from './shared/Button';
 
 const Footer = () => {
   const [email, setEmail] = useState('');

@@ -1,7 +1,7 @@
 'use client';
 
 import { Heart, Brain, Shield, Zap, Clock, Users, BarChart, Cloud, Sparkles, CheckCircle, ArrowRight } from 'lucide-react';
-import Button from './Shared/Button';
+import Button from './shared/Button';
 
 const ValueProposition = () => {
   const coreFeatures = [

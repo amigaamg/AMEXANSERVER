@@ -1,4 +1,4 @@
-import Button from './Shared/Button';
+import Button from './shared/Button';
 import { ArrowRight, Shield, Clock, Users, CheckCircle } from 'lucide-react';
 
 const CallToAction = () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Button from './Shared/Button';
+import Button from './shared/Button';
 import { UserPlus, BarChart3, MessageSquare, CheckCircle, ChevronRight, Sparkles, Shield, Clock, Users } from 'lucide-react';
 
 const HowItWorks = () => {
