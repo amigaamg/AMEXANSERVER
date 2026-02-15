@@ -17,6 +17,7 @@ export default function ConsultationPage() {
   const [remoteStreamReady, setRemoteStreamReady] = useState(false);
   const [connectionState, setConnectionState] = useState("new");
   const [userRole, setUserRole] = useState<"patient" | "doctor" | null>(null);
+  const [remotePlayBlocked, setRemotePlayBlocked] = useState(false); // for manual play button
 
   const localVideo = useRef<HTMLVideoElement>(null);
   const remoteVideo = useRef<HTMLVideoElement>(null);
@@ -30,14 +31,23 @@ export default function ConsultationPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
   const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || API_BASE;
 
-  // ICE Servers – only STUN for local testing
+  // ✅ Your Metered TURN/STUN servers
   const iceServers = {
     iceServers: [
-      { urls: "stun:stun.l.google.com:19302" }
+      { urls: "stun:stun.l.google.com:19302" },
+      {
+        urls: [
+          "turn:videoamexan.metered.live:80",
+          "turn:videoamexan.metered.live:443",
+          "turn:videoamexan.metered.live:3478"
+        ],
+        username: "videoamexan",
+        credential: "_R_tKrF3xSicInRntQvEGYkt6mM_Xj2uIKsA1Cc-FQqdrpfM"
+      }
     ]
   };
 
-  // Fetch appointment and determine role
+  // 1. Fetch appointment and determine role
   useEffect(() => {
     const fetchAppointment = async () => {
       try {
@@ -69,7 +79,7 @@ export default function ConsultationPage() {
     fetchAppointment();
   }, [id, API_BASE, router]);
 
-  // Initialize WebRTC and socket
+  // 2. Initialize WebRTC and socket
   useEffect(() => {
     if (!appointment?.roomId || !userRole) return;
 
@@ -116,10 +126,16 @@ export default function ConsultationPage() {
 
         pc.ontrack = (e) => {
           console.log("✅ Remote track received!");
+          console.log("Track kinds:", e.streams[0].getTracks().map(t => t.kind)); // should include 'audio'
           if (remoteVideo.current) {
             remoteVideo.current.srcObject = e.streams[0];
             remoteVideo.current.muted = false;
-            remoteVideo.current.play().catch(console.error);
+            remoteVideo.current.volume = 1.0;
+            // Try to play – may be blocked by browser autoplay policy
+            remoteVideo.current.play().catch((err) => {
+              console.warn("Autoplay blocked – user must click play button", err);
+              setRemotePlayBlocked(true);
+            });
           }
           setRemoteStreamReady(true);
         };
@@ -136,8 +152,7 @@ export default function ConsultationPage() {
           }
         };
 
-        // --- Role-based offer/answer ---
-        // Patient creates offer after a short delay
+        // Role-based negotiation: patient creates offer
         if (userRole === "patient") {
           setTimeout(async () => {
             if (!pc || offerMade.current) return;
@@ -153,12 +168,11 @@ export default function ConsultationPage() {
           }, 1000);
         }
 
-        // --- Socket handlers ---
+        // Socket handlers
         socket.on("offer", async (offer: RTCSessionDescriptionInit) => {
           console.log("📞 Received offer");
           if (!pc) return;
-          // Only doctor should answer
-          if (userRole !== "doctor") return;
+          if (userRole !== "doctor") return; // only doctor answers
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
             remoteDescriptionSet.current = true;
@@ -226,6 +240,13 @@ export default function ConsultationPage() {
     setMessageInput("");
   };
 
+  const playRemoteVideo = () => {
+    if (remoteVideo.current) {
+      remoteVideo.current.play().catch(err => console.error("Manual play failed", err));
+      setRemotePlayBlocked(false);
+    }
+  };
+
   if (loading) return <div className="p-6 text-center">Loading consultation...</div>;
   if (error) return <div className="p-6 text-red-600 text-center">{error}</div>;
   if (!appointment) return <div className="p-6 text-center">Appointment not found.</div>;
@@ -259,6 +280,14 @@ export default function ConsultationPage() {
             className="w-full bg-black rounded"
             style={{ height: 240 }}
           />
+          {remotePlayBlocked && (
+            <button
+              onClick={playRemoteVideo}
+              className="mt-2 bg-yellow-500 text-white px-4 py-2 rounded"
+            >
+              Click to enable remote audio/video
+            </button>
+          )}
         </div>
       </div>
 
