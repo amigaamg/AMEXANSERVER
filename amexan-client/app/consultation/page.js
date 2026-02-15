@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = 'force-dynamic'; // 👈 prevents prerendering
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -17,9 +18,12 @@ export default function Consultation() {
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
 
+  // Use environment variable for socket URL (fallback to localhost)
+  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+
   useEffect(() => {
     // 1. Socket connection
-    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000");
+    const socket = io(SOCKET_URL);
     socketRef.current = socket;
 
     socket.on("connect", () => {
@@ -64,8 +68,6 @@ export default function Consultation() {
         };
 
         // ----- SIMPLE, FOOLPROOF OFFER LOGIC -----
-        // After 1 second, EVERYONE sends an offer. The first one will connect,
-        // the second will be ignored – but that's fine, connection happens.
         setTimeout(async () => {
           console.log("📞 Sending offer...");
           const offer = await pc.createOffer();
@@ -121,7 +123,7 @@ export default function Consultation() {
       if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
       if (peerConnection.current) peerConnection.current.close();
     };
-  }, [roomId]);
+  }, [roomId, SOCKET_URL]);
 
   const sendMessage = (e) => {
     e.preventDefault();
