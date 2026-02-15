@@ -1,12 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
-const Appointment = require("../../models/Appointment");  // ✅ fixed path
-const Service = require("../../models/Service");          // ✅ fixed path
+const Appointment = require("../../models/Appointment");
+const Service = require("../../models/Service");
 
-// CREATE appointment (auto‑fill required fields)
+// CREATE appointment
 router.post("/create", async (req, res) => {
   try {
+    console.log("📝 Create appointment request body:", req.body);
     let { patientId, doctorId, serviceId, date, startTime, durationMinutes, endTime, price } = req.body;
 
     if (!patientId || !doctorId || !serviceId || !date || !startTime) {
@@ -14,10 +15,15 @@ router.post("/create", async (req, res) => {
     }
 
     const service = await Service.findById(serviceId);
-    if (!service) return res.status(404).json({ error: "Service not found" });
+    if (!service) {
+      console.error("Service not found with ID:", serviceId);
+      return res.status(404).json({ error: "Service not found" });
+    }
 
     durationMinutes = durationMinutes || service.durationMinutes;
-    if (!durationMinutes) return res.status(400).json({ error: "Duration missing" });
+    if (!durationMinutes) {
+      return res.status(400).json({ error: "Duration missing" });
+    }
 
     price = price || service.price || 1;
 
@@ -46,6 +52,7 @@ router.post("/create", async (req, res) => {
     });
 
     await appointment.save();
+    console.log("✅ Appointment created with ID:", appointment._id);
     res.status(201).json(appointment);
   } catch (err) {
     console.error("❌ Create appointment error:", err);

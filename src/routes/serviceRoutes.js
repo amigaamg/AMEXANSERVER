@@ -27,12 +27,11 @@ const Service =
 // CREATE SERVICE
 router.post("/create", async (req, res) => {
   try {
-    console.log("CREATE HIT");
-
-    const { doctorId, title, description, durationMinutes } = req.body;
+    console.log("CREATE HIT with body:", req.body);
+    const { doctorId, title, description, durationMinutes, price } = req.body;
 
     if (!doctorId || !title) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res.status(400).json({ error: "Missing required fields: doctorId, title" });
     }
 
     const service = await Service.create({
@@ -40,8 +39,11 @@ router.post("/create", async (req, res) => {
       title,
       description,
       durationMinutes,
+      price: price || 1,
+      isActive: true,
     });
 
+    console.log("✅ Service created:", service._id);
     res.status(201).json(service);
   } catch (err) {
     console.error("CREATE ERROR:", err);
@@ -49,27 +51,41 @@ router.post("/create", async (req, res) => {
   }
 });
 
-// GET ALL
+// GET ALL active services
 router.get("/", async (req, res) => {
-  const services = await Service.find({ isActive: true })
-    .populate("doctorId", "name");
-  res.json(services);
+  try {
+    const services = await Service.find({ isActive: true })
+      .populate("doctorId", "name");
+    res.json(services);
+  } catch (err) {
+    console.error("GET services error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET DOCTOR SERVICES
 router.get("/doctor/:doctorId", async (req, res) => {
-  const services = await Service.find({
-    doctorId: req.params.doctorId,
-  });
-  res.json(services);
+  try {
+    const services = await Service.find({ doctorId: req.params.doctorId });
+    res.json(services);
+  } catch (err) {
+    console.error("GET doctor services error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // TOGGLE
 router.put("/toggle/:id", async (req, res) => {
-  const service = await Service.findById(req.params.id);
-  service.isActive = !service.isActive;
-  await service.save();
-  res.json(service);
+  try {
+    const service = await Service.findById(req.params.id);
+    if (!service) return res.status(404).json({ error: "Service not found" });
+    service.isActive = !service.isActive;
+    await service.save();
+    res.json(service);
+  } catch (err) {
+    console.error("Toggle error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

@@ -9,15 +9,17 @@ export default function BookService() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/services")
+      .get(`${API_BASE}/api/services`)
       .then((res) => setServices(res.data))
       .catch((err) => {
         console.error("Failed to load services:", err);
         alert("Could not load services. Please try again.");
       });
-  }, []);
+  }, [API_BASE]);
 
   const handleBook = async (service: any) => {
     setLoading(true);
@@ -29,16 +31,13 @@ export default function BookService() {
         return;
       }
 
-      const res = await axios.post(
-        "http://localhost:5000/api/appointments/create",
-        {
-          patientId: user._id,
-          doctorId: service.doctorId?._id,   // 👈 critical fix
-          serviceId: service._id,
-          date: new Date().toISOString().split("T")[0],
-          startTime: "10:00",
-        }
-      );
+      const res = await axios.post(`${API_BASE}/api/appointments/create`, {
+        patientId: user._id,
+        doctorId: service.doctorId?._id,
+        serviceId: service._id,
+        date: new Date().toISOString().split("T")[0],
+        startTime: "10:00",
+      });
 
       router.push(`/dashboard/patient/payment/${res.data._id}`);
     } catch (err: any) {
@@ -59,7 +58,7 @@ export default function BookService() {
           <p>{service.description}</p>
           <p>Doctor: Dr. {service.doctorId?.name || "Unknown"}</p>
           <p>Duration: {service.durationMinutes} mins</p>
-          <p className="font-bold">KES 1</p>
+          <p className="font-bold">KES {service.price || 1}</p>
 
           <button
             onClick={() => handleBook(service)}

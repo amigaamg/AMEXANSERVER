@@ -8,9 +8,9 @@ export default function PaymentPage() {
   const { id } = useParams();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [testLoading, setTestLoading] = useState(false);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -33,12 +33,11 @@ export default function PaymentPage() {
     }
   };
 
-  // 🔧 TEST BUTTON: manually confirm and go to consultation
   const handleManualConfirm = async () => {
     setTestLoading(true);
     try {
       await axios.post(`${API_BASE}/api/payments/manual-confirm/${id}`);
-      router.push(`/consultation/${id}`); // redirect to consultation page
+      router.push(`/consultation/${id}`);
     } catch (err: any) {
       console.error("Manual confirm error:", err);
       alert("Failed to confirm manually");
@@ -82,7 +81,6 @@ export default function PaymentPage() {
         </button>
       </form>
 
-      {/* 🔧 TEST BUTTON – remove before going live */}
       <div className="mt-6 pt-4 border-t">
         <button
           onClick={handleManualConfirm}
