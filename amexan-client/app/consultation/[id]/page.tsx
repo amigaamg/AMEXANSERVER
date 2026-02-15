@@ -33,8 +33,13 @@ export default function ConsultationPage() {
   const offerMade = useRef(false);
   const makingOffer = useRef(false);
   const offerTimer = useRef<NodeJS.Timeout | null>(null);
-  // FIX: Track whether the peer joined BEFORE us so we know to (re)send offer
   const peerAlreadyInRoom = useRef(false);
+
+  // ── Web Audio API boost refs ──────────────────────────────────────────────────
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const remoteSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const BOOST_GAIN = 3.5; // 3.5× amplification (~11 dB boost)
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
   const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || API_BASE;
@@ -53,6 +58,53 @@ export default function ConsultationPage() {
         credential: "_R_tKrF3xSicInRntQvEGYkt6mM_Xj2uIKsA1Cc-FQqdrpfM",
       },
     ],
+  };
+
+  // ─── Web Audio boost — routes remote video audio through a GainNode ──────────
+  // The <video> element maxes out at volume=1.0 (~0 dB).
+  // Using AudioContext lets us push gain to 3.5× (~11 dB) which feels loud & clear.
+  const applyAudioBoost = (videoEl: HTMLVideoElement) => {
+    try {
+      // Reuse existing context if already created (one per page lifetime)
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+
+      // Resume if suspended (browsers suspend AudioContext until user gesture)
+      if (ctx.state === "suspended") ctx.resume();
+
+      // Disconnect old nodes if re-applying (e.g. stream changed)
+      if (remoteSourceRef.current) {
+        try { remoteSourceRef.current.disconnect(); } catch (_) {}
+      }
+      if (gainNodeRef.current) {
+        try { gainNodeRef.current.disconnect(); } catch (_) {}
+      }
+
+      // Build graph: videoElement → GainNode → speakers
+      const source = ctx.createMediaElementSource(videoEl);
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = BOOST_GAIN;
+
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      remoteSourceRef.current = source;
+      gainNodeRef.current = gainNode;
+
+      // IMPORTANT: mute the video element itself — audio now comes from AudioContext
+      // (if we don't do this we'd get double audio at conflicting volumes)
+      videoEl.muted = true;
+
+      console.log(`🔊 Audio boost applied: gain=${BOOST_GAIN}×`);
+    } catch (err) {
+      // createMediaElementSource throws if called twice on same element — safe to ignore
+      console.warn("applyAudioBoost error (usually safe):", err);
+      // Fallback: just max out the video volume
+      videoEl.muted = false;
+      videoEl.volume = 1.0;
+    }
   };
 
   // ─── Fetch appointment + determine role ──────────────────────────────────────
@@ -211,9 +263,40 @@ export default function ConsultationPage() {
         }
       };
 
+      // ── Boost microphone gain BEFORE sending over WebRTC ────────────────────
+      // This means the doctor hears the patient louder AND the patient's mic
+      // signal going to the doctor is also boosted at the source.
+      const boostMicGain = async (originalStream: MediaStream): Promise<MediaStream> => {
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const source = ctx.createMediaStreamSource(originalStream);
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 2.5; // Boost outgoing mic by 2.5×
+
+          const dest = ctx.createMediaStreamDestination();
+          source.connect(gainNode);
+          gainNode.connect(dest);
+
+          // Merge boosted audio track with original video track
+          const boostedStream = new MediaStream();
+          dest.stream.getAudioTracks().forEach(t => boostedStream.addTrack(t));
+          originalStream.getVideoTracks().forEach(t => boostedStream.addTrack(t));
+
+          console.log("🎤 Outgoing mic gain boosted 2.5×");
+          return boostedStream;
+        } catch (err) {
+          console.warn("Mic gain boost failed, using original stream:", err);
+          return originalStream;
+        }
+      };
+
+      // Apply mic boost then add tracks to peer connection
+      const boostedStream = await boostMicGain(stream);
+      localStreamRef.current = boostedStream;
+
       // FIX 4: Add ALL tracks (audio + video) before creating offer
-      stream.getTracks().forEach((track) => {
-        pc.addTrack(track, stream);
+      boostedStream.getTracks().forEach((track) => {
+        pc.addTrack(track, boostedStream);
         console.log(`➕ Added local ${track.kind} track: ${track.label}`);
       });
 
@@ -223,7 +306,7 @@ export default function ConsultationPage() {
         }
       };
 
-      // FIX 5: ontrack — attach AFTER srcObject is set, then play
+      // ontrack — attach stream, boost audio via Web Audio API GainNode
       pc.ontrack = (e) => {
         console.log("🎯 Remote track received:", e.track.kind, e.track.label);
 
@@ -233,26 +316,29 @@ export default function ConsultationPage() {
           return;
         }
 
-        const remoteAudio = remoteStream.getAudioTracks();
-        const remoteVideo_ = remoteStream.getVideoTracks();
         console.log(
-          `Remote stream → audio:${remoteAudio.length} video:${remoteVideo_.length}`
+          `Remote stream → audio:${remoteStream.getAudioTracks().length} video:${remoteStream.getVideoTracks().length}`
         );
 
         if (remoteVideo.current) {
-          // FIX 6: Set srcObject FIRST, then unmute, then play
+          // Step 1: attach stream to video element
           remoteVideo.current.srcObject = remoteStream;
-          remoteVideo.current.muted = false;   // ← MUST be false for remote audio
+          // Step 2: volume = 1 on the element (AudioContext will boost on top)
           remoteVideo.current.volume = 1.0;
 
+          // Step 3: play, then wire up the audio boost graph
           remoteVideo.current
             .play()
             .then(() => {
-              console.log("▶️ Remote video playing with audio");
+              console.log("▶️ Remote video playing — applying audio boost");
+              // Apply boost AFTER play() succeeds (requires AudioContext to be running)
+              applyAudioBoost(remoteVideo.current!);
               setRemotePlayBlocked(false);
             })
             .catch((err) => {
               console.warn("Autoplay blocked – waiting for user gesture:", err);
+              // Keep element unmuted so manual play button can also trigger boost
+              remoteVideo.current!.muted = false;
               setRemotePlayBlocked(true);
             });
         }
@@ -351,6 +437,13 @@ export default function ConsultationPage() {
       socket.disconnect();
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       peerConnection.current?.close();
+      // Clean up Web Audio graph
+      try { gainNodeRef.current?.disconnect(); } catch (_) {}
+      try { remoteSourceRef.current?.disconnect(); } catch (_) {}
+      try { audioCtxRef.current?.close(); } catch (_) {}
+      audioCtxRef.current = null;
+      gainNodeRef.current = null;
+      remoteSourceRef.current = null;
     };
   }, [appointment, userRole, currentUser, SOCKET_URL]);
 
@@ -384,7 +477,11 @@ export default function ConsultationPage() {
       remoteVideo.current.volume = 1.0;
       remoteVideo.current
         .play()
-        .then(() => setRemotePlayBlocked(false))
+        .then(() => {
+          // User gesture just happened — safe to start AudioContext and boost
+          applyAudioBoost(remoteVideo.current!);
+          setRemotePlayBlocked(false);
+        })
         .catch((err) => console.error("Manual play failed:", err));
     }
   };
@@ -400,7 +497,13 @@ export default function ConsultationPage() {
   };
 
   const toggleRemoteMute = () => {
-    if (remoteVideo.current) {
+    if (gainNodeRef.current) {
+      // Toggle gain: 0 = muted, BOOST_GAIN = full boosted volume
+      const isMuted = gainNodeRef.current.gain.value === 0;
+      gainNodeRef.current.gain.value = isMuted ? BOOST_GAIN : 0;
+      setRemoteMuted(!isMuted);
+    } else if (remoteVideo.current) {
+      // Fallback if AudioContext not running
       remoteVideo.current.muted = !remoteVideo.current.muted;
       setRemoteMuted(remoteVideo.current.muted);
     }
