@@ -16,7 +16,6 @@ const server = http.createServer(app);
 // -----------------------------
 // Middleware
 // -----------------------------
-// Allow requests from your frontend (update the origin for production)
 app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
 
@@ -41,6 +40,7 @@ const connectDB = async () => {
 const appointmentRoutes = require("./src/routes/appointmentRoutes");
 const serviceRoutes = require("./src/routes/serviceRoutes");
 const paymentRoutes = require("./src/routes/paymentRoutes");
+const messageRoutes = require("./src/routes/messageRoutes"); // ✅ added for chat history
 
 // -----------------------------
 // User Schema & Model (inline for simplicity)
@@ -108,6 +108,7 @@ app.get("/", (req, res) => {
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/messages", messageRoutes); // ✅ now active
 
 // -----------------------------
 // Socket.IO (Signaling for Video/Chat)
@@ -137,6 +138,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send_message", ({ room, message }) => {
+    // The actual saving is done via HTTP POST to /api/messages.
+    // This just forwards the message for real‑time delivery.
     socket.to(room).emit("receive_message", { message });
   });
 

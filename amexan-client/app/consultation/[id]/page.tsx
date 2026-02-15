@@ -18,6 +18,7 @@ export default function ConsultationPage() {
   const [connectionState, setConnectionState] = useState("new");
   const [userRole, setUserRole] = useState<"patient" | "doctor" | null>(null);
   const [remotePlayBlocked, setRemotePlayBlocked] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const localVideo = useRef<HTMLVideoElement>(null);
   const remoteVideo = useRef<HTMLVideoElement>(null);
@@ -28,6 +29,7 @@ export default function ConsultationPage() {
   const remoteDescriptionSet = useRef(false);
   const offerMade = useRef(false);
   const makingOffer = useRef(false);
+  const offerTimer = useRef<NodeJS.Timeout | null>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
   const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || API_BASE;
@@ -57,6 +59,7 @@ export default function ConsultationPage() {
           return;
         }
         const user = JSON.parse(storedUser);
+        setCurrentUser(user);
 
         const res = await axios.get(`${API_BASE}/api/appointments/${id}`);
         const apt = res.data.appointment || res.data;
@@ -81,9 +84,27 @@ export default function ConsultationPage() {
     fetchAppointment();
   }, [id, API_BASE, router]);
 
+  // Load chat history
+  useEffect(() => {
+    if (!appointment?._id || !currentUser) return;
+    const loadMessages = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/api/messages/${appointment._id}`);
+        const formatted = res.data.map((m: any) => ({
+          text: m.text,
+          from: m.senderId._id === currentUser._id ? "local" : "remote",
+        }));
+        setMessages(formatted);
+      } catch (err) {
+        console.error("Failed to load messages:", err);
+      }
+    };
+    loadMessages();
+  }, [appointment, currentUser, API_BASE]);
+
   // Initialize WebRTC and socket
   useEffect(() => {
-    if (!appointment?.roomId || !userRole) return;
+    if (!appointment?.roomId || !userRole || !currentUser) return;
 
     const roomId = appointment.roomId;
     console.log("Using roomId:", roomId, "Role:", userRole);
@@ -153,7 +174,8 @@ export default function ConsultationPage() {
 
         // Patient creates offer after a short delay, but only if pc still exists and is not closed
         if (userRole === "patient") {
-          setTimeout(async () => {
+          if (offerTimer.current) clearTimeout(offerTimer.current);
+          offerTimer.current = setTimeout(async () => {
             if (!pc || pc.signalingState === "closed") {
               console.log("PeerConnection is closed, aborting offer");
               return;
@@ -229,10 +251,12 @@ export default function ConsultationPage() {
     startWebRTC();
 
     socket.on("receive_message", (data: { message: string }) => {
+      // When a message arrives, add it to the state
       setMessages((prev) => [...prev, { text: data.message, from: "remote" }]);
     });
 
     return () => {
+      if (offerTimer.current) clearTimeout(offerTimer.current);
       socket.disconnect();
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -241,13 +265,25 @@ export default function ConsultationPage() {
         peerConnection.current.close();
       }
     };
-  }, [appointment, userRole, SOCKET_URL]);
+  }, [appointment, userRole, currentUser, SOCKET_URL]);
 
-  const sendMessage = (e: React.FormEvent) => {
+  const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !socketRef.current || !appointment?.roomId) return;
-    socketRef.current.emit("send_message", { room: appointment.roomId, message: messageInput });
-    setMessages((prev) => [...prev, { text: messageInput, from: "local" }]);
+    if (!messageInput.trim() || !socketRef.current || !appointment?.roomId || !currentUser?._id) return;
+    const msg = messageInput;
+    // Emit via socket for real-time delivery
+    socketRef.current.emit("send_message", { room: appointment.roomId, message: msg });
+    // Save to backend for history
+    try {
+      await axios.post(`${API_BASE}/api/messages`, {
+        appointmentId: appointment._id,
+        senderId: currentUser._id,
+        text: msg,
+      });
+    } catch (err) {
+      console.error("Failed to save message:", err);
+    }
+    setMessages((prev) => [...prev, { text: msg, from: "local" }]);
     setMessageInput("");
   };
 
@@ -262,7 +298,6 @@ export default function ConsultationPage() {
   if (error) return <div className="p-6 text-red-600 text-center">{error}</div>;
   if (!appointment) return <div className="p-6 text-center">Appointment not found.</div>;
 
-  // Use populated doctor name or fallback to role-based name
   const doctorName = appointment.doctorId?.name || (userRole === "doctor" ? "You" : "Doctor");
   const patientName = appointment.patientId?.name || (userRole === "patient" ? "You" : "Patient");
 
