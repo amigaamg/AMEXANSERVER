@@ -17,7 +17,7 @@ export default function ConsultationPage() {
   const [remoteStreamReady, setRemoteStreamReady] = useState(false);
   const [connectionState, setConnectionState] = useState("new");
   const [userRole, setUserRole] = useState<"patient" | "doctor" | null>(null);
-  const [remotePlayBlocked, setRemotePlayBlocked] = useState(false); // for manual play button
+  const [remotePlayBlocked, setRemotePlayBlocked] = useState(false);
 
   const localVideo = useRef<HTMLVideoElement>(null);
   const remoteVideo = useRef<HTMLVideoElement>(null);
@@ -27,11 +27,11 @@ export default function ConsultationPage() {
   const candidateQueue = useRef<RTCIceCandidateInit[]>([]);
   const remoteDescriptionSet = useRef(false);
   const offerMade = useRef(false);
+  const makingOffer = useRef(false);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
   const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || API_BASE;
 
-  // ✅ Your Metered TURN/STUN servers
   const iceServers = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
@@ -47,7 +47,7 @@ export default function ConsultationPage() {
     ]
   };
 
-  // 1. Fetch appointment and determine role
+  // Fetch appointment and determine role
   useEffect(() => {
     const fetchAppointment = async () => {
       try {
@@ -59,7 +59,9 @@ export default function ConsultationPage() {
         const user = JSON.parse(storedUser);
 
         const res = await axios.get(`${API_BASE}/api/appointments/${id}`);
-        const apt = res.data;
+        const apt = res.data.appointment || res.data;
+
+        if (!apt) throw new Error("Appointment not found");
 
         if (user._id !== apt.patientId?._id && user._id !== apt.doctorId?._id) {
           setError("You are not authorized.");
@@ -79,7 +81,7 @@ export default function ConsultationPage() {
     fetchAppointment();
   }, [id, API_BASE, router]);
 
-  // 2. Initialize WebRTC and socket
+  // Initialize WebRTC and socket
   useEffect(() => {
     if (!appointment?.roomId || !userRole) return;
 
@@ -115,7 +117,6 @@ export default function ConsultationPage() {
           console.log("ICE connection state:", pc.iceConnectionState);
         };
 
-        // Add local tracks
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
         pc.onicecandidate = (e) => {
@@ -126,12 +127,11 @@ export default function ConsultationPage() {
 
         pc.ontrack = (e) => {
           console.log("✅ Remote track received!");
-          console.log("Track kinds:", e.streams[0].getTracks().map(t => t.kind)); // should include 'audio'
+          console.log("Track kinds:", e.streams[0].getTracks().map(t => t.kind));
           if (remoteVideo.current) {
             remoteVideo.current.srcObject = e.streams[0];
             remoteVideo.current.muted = false;
             remoteVideo.current.volume = 1.0;
-            // Try to play – may be blocked by browser autoplay policy
             remoteVideo.current.play().catch((err) => {
               console.warn("Autoplay blocked – user must click play button", err);
               setRemotePlayBlocked(true);
@@ -140,7 +140,6 @@ export default function ConsultationPage() {
           setRemoteStreamReady(true);
         };
 
-        // Process queued candidates after remote description set
         const processQueuedCandidates = async () => {
           while (candidateQueue.current.length) {
             const candidate = candidateQueue.current.shift();
@@ -152,27 +151,37 @@ export default function ConsultationPage() {
           }
         };
 
-        // Role-based negotiation: patient creates offer
+        // Patient creates offer after a short delay, but only if pc still exists and is not closed
         if (userRole === "patient") {
           setTimeout(async () => {
-            if (!pc || offerMade.current) return;
+            if (!pc || pc.signalingState === "closed") {
+              console.log("PeerConnection is closed, aborting offer");
+              return;
+            }
+            if (offerMade.current) return;
             try {
               console.log("📞 Patient creating offer...");
+              makingOffer.current = true;
               const offer = await pc.createOffer();
               await pc.setLocalDescription(offer);
               socket.emit("offer", { room: roomId, offer });
               offerMade.current = true;
             } catch (err) {
               console.error("Error creating offer:", err);
+            } finally {
+              makingOffer.current = false;
             }
           }, 1000);
         }
 
-        // Socket handlers
         socket.on("offer", async (offer: RTCSessionDescriptionInit) => {
           console.log("📞 Received offer");
-          if (!pc) return;
-          if (userRole !== "doctor") return; // only doctor answers
+          if (!pc || pc.signalingState === "closed") return;
+          if (userRole !== "doctor") return;
+          if (makingOffer.current) {
+            console.log("Ignoring offer because we are making one");
+            return;
+          }
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
             remoteDescriptionSet.current = true;
@@ -187,7 +196,7 @@ export default function ConsultationPage() {
 
         socket.on("answer", async (answer: RTCSessionDescriptionInit) => {
           console.log("📞 Received answer");
-          if (!pc) return;
+          if (!pc || pc.signalingState === "closed") return;
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
             remoteDescriptionSet.current = true;
@@ -199,7 +208,7 @@ export default function ConsultationPage() {
 
         socket.on("ice_candidate", async (candidate: RTCIceCandidateInit) => {
           console.log("🧊 Received ICE candidate");
-          if (!pc) return;
+          if (!pc || pc.signalingState === "closed") return;
           if (!remoteDescriptionSet.current) {
             candidateQueue.current.push(candidate);
           } else {
@@ -228,7 +237,9 @@ export default function ConsultationPage() {
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
       }
-      if (peerConnection.current) peerConnection.current.close();
+      if (peerConnection.current) {
+        peerConnection.current.close();
+      }
     };
   }, [appointment, userRole, SOCKET_URL]);
 
@@ -251,11 +262,15 @@ export default function ConsultationPage() {
   if (error) return <div className="p-6 text-red-600 text-center">{error}</div>;
   if (!appointment) return <div className="p-6 text-center">Appointment not found.</div>;
 
+  // Use populated doctor name or fallback to role-based name
+  const doctorName = appointment.doctorId?.name || (userRole === "doctor" ? "You" : "Doctor");
+  const patientName = appointment.patientId?.name || (userRole === "patient" ? "You" : "Patient");
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-2">Consultation Room</h1>
       <p className="mb-4 text-gray-600">
-        Room: {appointment.roomId} | Doctor: Dr. {appointment.doctorId?.name || "Unknown"} | Patient: {appointment.patientId?.name || "You"}
+        Room: {appointment.roomId} | Doctor: Dr. {doctorName} | Patient: {patientName}
       </p>
       <p className="mb-2 text-sm">Connection: {connectionState} | Role: {userRole}</p>
 
@@ -291,7 +306,6 @@ export default function ConsultationPage() {
         </div>
       </div>
 
-      {/* Chat */}
       <div className="border rounded p-4">
         <h2 className="font-semibold mb-2">💬 Chat</h2>
         <div className="h-48 overflow-y-auto border p-2 mb-2 bg-gray-50">

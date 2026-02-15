@@ -15,8 +15,8 @@ const Service =
           required: true,
         },
         title: { type: String, required: true },
-        description: String,
-        durationMinutes: Number,
+        description: { type: String, default: "" },
+        durationMinutes: { type: Number, default: 30 },
         price: { type: Number, default: 1 },
         isActive: { type: Boolean, default: true },
       },
@@ -24,67 +24,74 @@ const Service =
     )
   );
 
+// -------------------- ROUTES -------------------- //
+
 // CREATE SERVICE
 router.post("/create", async (req, res) => {
   try {
-    console.log("CREATE HIT with body:", req.body);
     const { doctorId, title, description, durationMinutes, price } = req.body;
 
     if (!doctorId || !title) {
-      return res.status(400).json({ error: "Missing required fields: doctorId, title" });
+      return res
+        .status(400)
+        .json({ error: "Missing required fields: doctorId, title" });
     }
 
     const service = await Service.create({
       doctorId,
       title,
-      description,
-      durationMinutes,
+      description: description || "",
+      durationMinutes: durationMinutes || 30,
       price: price || 1,
       isActive: true,
     });
 
-    console.log("✅ Service created:", service._id);
-    res.status(201).json(service);
+    res.status(201).json({ status: "success", service });
   } catch (err) {
-    console.error("CREATE ERROR:", err);
-    res.status(500).json({ error: err.message });
+    console.error("CREATE SERVICE ERROR:", err);
+    res.status(500).json({ status: "error", message: err.message });
   }
 });
 
-// GET ALL active services
+// GET ALL ACTIVE SERVICES
 router.get("/", async (req, res) => {
   try {
-    const services = await Service.find({ isActive: true })
-      .populate("doctorId", "name");
-    res.json(services);
+    const services = await Service.find({ isActive: true }).populate(
+      "doctorId",
+      "name"
+    );
+    res.json({ status: "success", services });
   } catch (err) {
-    console.error("GET services error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("GET ALL SERVICES ERROR:", err);
+    res.status(500).json({ status: "error", message: err.message });
   }
 });
 
-// GET DOCTOR SERVICES
+// GET ALL SERVICES FOR A DOCTOR
 router.get("/doctor/:doctorId", async (req, res) => {
   try {
     const services = await Service.find({ doctorId: req.params.doctorId });
-    res.json(services);
+    res.json({ status: "success", services });
   } catch (err) {
-    console.error("GET doctor services error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("GET DOCTOR SERVICES ERROR:", err);
+    res.status(500).json({ status: "error", message: err.message });
   }
 });
 
-// TOGGLE
+// TOGGLE SERVICE ACTIVE/INACTIVE
 router.put("/toggle/:id", async (req, res) => {
   try {
     const service = await Service.findById(req.params.id);
-    if (!service) return res.status(404).json({ error: "Service not found" });
+    if (!service)
+      return res.status(404).json({ status: "error", error: "Service not found" });
+
     service.isActive = !service.isActive;
     await service.save();
-    res.json(service);
+
+    res.json({ status: "success", service });
   } catch (err) {
-    console.error("Toggle error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("TOGGLE SERVICE ERROR:", err);
+    res.status(500).json({ status: "error", message: err.message });
   }
 });
 
