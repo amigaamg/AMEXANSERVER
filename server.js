@@ -40,7 +40,9 @@ const connectDB = async () => {
 const appointmentRoutes = require("./src/routes/appointmentRoutes");
 const serviceRoutes = require("./src/routes/serviceRoutes");
 const paymentRoutes = require("./src/routes/paymentRoutes");
-const messageRoutes = require("./src/routes/messageRoutes"); // ✅ added for chat history
+const messageRoutes = require("./src/routes/messageRoutes");
+const triageRoutes = require("./src/routes/Triageroutes");
+const patientRoutes = require("./src/routes/patientRoutes");
 
 // -----------------------------
 // User Schema & Model (inline for simplicity)
@@ -108,7 +110,9 @@ app.get("/", (req, res) => {
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/payments", paymentRoutes);
-app.use("/api/messages", messageRoutes); // ✅ now active
+app.use("/api/messages", messageRoutes);
+app.use("/api/triage", triageRoutes);
+app.use("/api/patients", patientRoutes);
 
 // -----------------------------
 // Socket.IO (Signaling for Video/Chat)
@@ -139,7 +143,7 @@ io.on("connection", (socket) => {
 
   socket.on("send_message", ({ room, message }) => {
     // The actual saving is done via HTTP POST to /api/messages.
-    // This just forwards the message for real‑time delivery.
+    // This just forwards the message for real-time delivery.
     socket.to(room).emit("receive_message", { message });
   });
 

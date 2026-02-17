@@ -24,7 +24,18 @@ router.post("/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    res.json({ token, user });
+    // ✅ Return only safe fields (exclude password)
+    const userResponse = {
+      _id: user._id,
+      id: user._id, // include both for frontend compatibility
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      universalId: user.universalId,
+      // Add any other fields the frontend needs (e.g., phone, photoUrl)
+    };
+
+    res.json({ token, user: userResponse });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error" });
