@@ -22,16 +22,14 @@ export default function DoctorDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect if not authenticated or not a doctor
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'doctor')) {
       router.push('/login');
     }
   }, [user, authLoading, router]);
 
-  // Fetch dashboard data
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.role !== 'doctor') return;
     const doctorId = user._id || user.id;
     if (!doctorId) {
       setError('Invalid doctor ID');
@@ -43,14 +41,35 @@ export default function DoctorDashboard() {
       try {
         setLoading(true);
         setError(null);
-        const [aptRes, patientRes, alertRes] = await Promise.all([
+
+        // Fetch each endpoint independently so one failure doesn't block others
+        const [aptRes, patientRes, alertRes] = await Promise.allSettled([
           api(`/api/doctors/${doctorId}/appointments/today`),
           api(`/api/doctors/${doctorId}/patients`),
           api(`/api/doctors/${doctorId}/alerts`),
         ]);
-        setAppointments(aptRes || []);
-        setPatients(patientRes || []);
-        setAlerts(alertRes || []);
+
+        if (aptRes.status === 'fulfilled') {
+          setAppointments(Array.isArray(aptRes.value) ? aptRes.value : []);
+        } else {
+          console.warn('Appointments fetch failed:', aptRes.reason?.message);
+          setAppointments([]);
+        }
+
+        if (patientRes.status === 'fulfilled') {
+          setPatients(Array.isArray(patientRes.value) ? patientRes.value : []);
+        } else {
+          console.warn('Patients fetch failed:', patientRes.reason?.message);
+          setPatients([]);
+        }
+
+        if (alertRes.status === 'fulfilled') {
+          setAlerts(Array.isArray(alertRes.value) ? alertRes.value : []);
+        } else {
+          console.warn('Alerts fetch failed:', alertRes.reason?.message);
+          setAlerts([]);
+        }
+
       } catch (err: any) {
         console.error('Dashboard fetch error:', err);
         setError(err.message || 'Failed to load dashboard data');
@@ -75,38 +94,14 @@ export default function DoctorDashboard() {
     );
   }
 
-  if (!user) return null;
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 48, height: 48, border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-          <p style={{ color: '#64748b' }}>Loading dashboard…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Card style={{ textAlign: 'center', padding: 40 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>Error</h2>
-          <p style={{ color: '#64748b', marginBottom: 16 }}>{error}</p>
-          <Button onClick={() => window.location.reload()}>Retry</Button>
-        </Card>
-      </div>
-    );
-  }
+  if (!user || user.role !== 'doctor') return null;
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: '🏠' },
-    { id: 'appointments', label: 'Appointments', icon: '📅' },
-    { id: 'patients', label: 'Patients', icon: '👥' },
-    { id: 'alerts', label: 'Alerts', icon: '🔔', badge: alerts.length },
-    { id: 'messages', label: 'Messages', icon: '💬' },
+    { id: 'overview',      label: 'Overview',      icon: '🏠' },
+    { id: 'appointments',  label: 'Appointments',   icon: '📅' },
+    { id: 'patients',      label: 'Patients',       icon: '👥' },
+    { id: 'alerts',        label: 'Alerts',         icon: '🔔', badge: alerts.length },
+    { id: 'messages',      label: 'Messages',       icon: '💬' },
   ];
 
   return (
@@ -120,9 +115,7 @@ export default function DoctorDashboard() {
               <span style={{ color: '#1e293b', fontWeight: 700, fontSize: 18 }}>AMEXAN</span>
               <span style={{ color: '#94a3b8', fontSize: 12, borderLeft: '1px solid #e2e8f0', paddingLeft: 12 }}>Doctor Portal</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, color: '#2563eb' }}>Dr. {user.name}</span>
-            </div>
+            <span style={{ fontSize: 14, color: '#2563eb' }}>Dr. {user.name}</span>
           </div>
         </div>
       </div>
@@ -164,40 +157,56 @@ export default function DoctorDashboard() {
 
       {/* Content */}
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
-        {activeTab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 20 }}>
-            <TodayAppointments appointments={appointments} />
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>Recent Alerts</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {alerts.slice(0, 5).map(alert => <AlertItem key={alert._id} alert={alert} />)}
+
+        {/* Error banner - non-blocking, dashboard still shows */}
+        {error && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: '#dc2626', fontSize: 14 }}>⚠️ {error}</span>
+            <button onClick={() => window.location.reload()} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}>Retry</button>
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+            <div style={{ width: 40, height: 40, border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 20 }}>
+                <TodayAppointments appointments={appointments} />
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>Recent Alerts</h3>
+                  {alerts.length === 0
+                    ? <Card><p style={{ color: '#94a3b8' }}>No alerts.</p></Card>
+                    : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{alerts.slice(0, 5).map(a => <AlertItem key={a._id} alert={a} />)}</div>
+                  }
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>Quick Actions</h3>
+                  <QuickActions />
+                </div>
               </div>
-            </div>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>Quick Actions</h3>
-              <QuickActions />
-            </div>
-          </div>
-        )}
-        {activeTab === 'appointments' && (
-          <TodayAppointments appointments={appointments} expanded />
-        )}
-        {activeTab === 'patients' && (
-          <PatientList patients={patients} />
-        )}
-        {activeTab === 'alerts' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {alerts.map(alert => <AlertItem key={alert._id} alert={alert} />)}
-          </div>
-        )}
-        {activeTab === 'messages' && (
-          <Card style={{ padding: 24, textAlign: 'center' }}>
-            <p style={{ color: '#94a3b8' }}>Messages feature coming soon.</p>
-          </Card>
+            )}
+            {activeTab === 'appointments' && <TodayAppointments appointments={appointments} expanded />}
+            {activeTab === 'patients' && <PatientList patients={patients} />}
+            {activeTab === 'alerts' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {alerts.length === 0
+                  ? <Card><p style={{ color: '#94a3b8' }}>No alerts.</p></Card>
+                  : alerts.map(a => <AlertItem key={a._id} alert={a} />)
+                }
+              </div>
+            )}
+            {activeTab === 'messages' && (
+              <Card style={{ padding: 24, textAlign: 'center' }}>
+                <p style={{ color: '#94a3b8' }}>Messages feature coming soon.</p>
+              </Card>
+            )}
+          </>
         )}
       </div>
 
-      {/* Floating action buttons */}
       <QuickActions floating />
     </div>
   );
