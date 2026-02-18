@@ -20,7 +20,7 @@ app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
 
 // -----------------------------
-// MongoDB Connection (with retry logic)
+// MongoDB Connection
 // -----------------------------
 const connectDB = async () => {
   try {
@@ -43,9 +43,10 @@ const paymentRoutes = require("./src/routes/paymentRoutes");
 const messageRoutes = require("./src/routes/messageRoutes");
 const triageRoutes = require("./src/routes/Triageroutes");
 const patientRoutes = require("./src/routes/patientRoutes");
+const doctorRoutes = require("./src/routes/doctorRoutes"); // ✅ NEW
 
 // -----------------------------
-// User Schema & Model (inline for simplicity)
+// User Schema & Model
 // -----------------------------
 const userSchema = new mongoose.Schema(
   {
@@ -69,7 +70,11 @@ app.post("/api/auth/register", async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email, password: hashed, role });
-    res.json({ message: "Registered successfully", user });
+
+    // Return user without password
+    const userObj = user.toObject();
+    delete userObj.password;
+    res.json({ message: "Registered successfully", user: userObj });
   } catch (err) {
     console.error("Register error:", err);
     res.status(500).json({ error: err.message });
@@ -90,7 +95,12 @@ app.post("/api/auth/login", async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
-    res.json({ token, user });
+
+    // Return user without password
+    const userObj = user.toObject();
+    delete userObj.password;
+
+    res.json({ token, user: userObj });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: err.message });
@@ -105,7 +115,7 @@ app.get("/", (req, res) => {
 });
 
 // -----------------------------
-// Use Other Routes
+// Mount Routes
 // -----------------------------
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/services", serviceRoutes);
@@ -113,9 +123,10 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/triage", triageRoutes);
 app.use("/api/patients", patientRoutes);
+app.use("/api/doctors", doctorRoutes); // ✅ NEW — fixes all 404s on doctor dashboard
 
 // -----------------------------
-// Socket.IO (Signaling for Video/Chat)
+// Socket.IO
 // -----------------------------
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
@@ -142,8 +153,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send_message", ({ room, message }) => {
-    // The actual saving is done via HTTP POST to /api/messages.
-    // This just forwards the message for real-time delivery.
     socket.to(room).emit("receive_message", { message });
   });
 
@@ -153,7 +162,7 @@ io.on("connection", (socket) => {
 });
 
 // -----------------------------
-// Start Server after DB Connection
+// Start Server
 // -----------------------------
 const PORT = process.env.PORT || 5000;
 

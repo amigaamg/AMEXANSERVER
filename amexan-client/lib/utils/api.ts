@@ -12,7 +12,6 @@ export async function api(url: string, options: RequestInit = {}) {
   });
   if (!res.ok) {
     if (res.status === 401) {
-      // Clear invalid token
       localStorage.removeItem('amexan_token');
       localStorage.removeItem('amexan_user');
     }
