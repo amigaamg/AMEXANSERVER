@@ -7,15 +7,9 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const { Server } = require("socket.io");
 
-// -----------------------------
-// Create App & Server
-// -----------------------------
 const app = express();
 const server = http.createServer(app);
 
-// -----------------------------
-// Middleware
-// -----------------------------
 app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
 
@@ -35,18 +29,7 @@ const connectDB = async () => {
 };
 
 // -----------------------------
-// Import Route Handlers
-// -----------------------------
-const appointmentRoutes = require("./src/routes/appointmentRoutes");
-const serviceRoutes = require("./src/routes/serviceRoutes");
-const paymentRoutes = require("./src/routes/paymentRoutes");
-const messageRoutes = require("./src/routes/messageRoutes");
-const triageRoutes = require("./src/routes/Triageroutes");
-const patientRoutes = require("./src/routes/patientRoutes");
-const doctorRoutes = require("./src/routes/doctorRoutes"); // ✅ NEW
-
-// -----------------------------
-// User Schema & Model
+// User Schema & Model (safe - won't conflict with doctorRoutes)
 // -----------------------------
 const userSchema = new mongoose.Schema(
   {
@@ -57,7 +40,20 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-const User = mongoose.model("User", userSchema);
+
+// ✅ Safe pattern - reuse existing model if already registered
+const User = mongoose.models.User || mongoose.model("User", userSchema);
+
+// -----------------------------
+// Import Route Handlers
+// -----------------------------
+const appointmentRoutes = require("./src/routes/appointmentRoutes");
+const serviceRoutes = require("./src/routes/serviceRoutes");
+const paymentRoutes = require("./src/routes/paymentRoutes");
+const messageRoutes = require("./src/routes/messageRoutes");
+const triageRoutes = require("./src/routes/Triageroutes");
+const patientRoutes = require("./src/routes/patientRoutes");
+const doctorRoutes = require("./src/routes/doctorRoutes");
 
 // -----------------------------
 // Authentication Routes
@@ -71,7 +67,6 @@ app.post("/api/auth/register", async (req, res) => {
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email, password: hashed, role });
 
-    // Return user without password
     const userObj = user.toObject();
     delete userObj.password;
     res.json({ message: "Registered successfully", user: userObj });
@@ -96,10 +91,8 @@ app.post("/api/auth/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    // Return user without password
     const userObj = user.toObject();
     delete userObj.password;
-
     res.json({ token, user: userObj });
   } catch (err) {
     console.error("Login error:", err);
@@ -123,7 +116,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/triage", triageRoutes);
 app.use("/api/patients", patientRoutes);
-app.use("/api/doctors", doctorRoutes); // ✅ NEW — fixes all 404s on doctor dashboard
+app.use("/api/doctors", doctorRoutes);
 
 // -----------------------------
 // Socket.IO
@@ -135,30 +128,12 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log(`🔌 Client connected: ${socket.id}`);
 
-  socket.on("join_room", (room) => {
-    socket.join(room);
-    console.log(`Socket ${socket.id} joined room ${room}`);
-  });
-
-  socket.on("offer", ({ room, offer }) => {
-    socket.to(room).emit("offer", offer);
-  });
-
-  socket.on("answer", ({ room, answer }) => {
-    socket.to(room).emit("answer", answer);
-  });
-
-  socket.on("ice_candidate", ({ room, candidate }) => {
-    socket.to(room).emit("ice_candidate", candidate);
-  });
-
-  socket.on("send_message", ({ room, message }) => {
-    socket.to(room).emit("receive_message", { message });
-  });
-
-  socket.on("disconnect", () => {
-    console.log(`❌ Client disconnected: ${socket.id}`);
-  });
+  socket.on("join_room", (room) => socket.join(room));
+  socket.on("offer", ({ room, offer }) => socket.to(room).emit("offer", offer));
+  socket.on("answer", ({ room, answer }) => socket.to(room).emit("answer", answer));
+  socket.on("ice_candidate", ({ room, candidate }) => socket.to(room).emit("ice_candidate", candidate));
+  socket.on("send_message", ({ room, message }) => socket.to(room).emit("receive_message", { message }));
+  socket.on("disconnect", () => console.log(`❌ Client disconnected: ${socket.id}`));
 });
 
 // -----------------------------
