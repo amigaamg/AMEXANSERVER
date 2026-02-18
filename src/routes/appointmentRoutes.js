@@ -4,41 +4,38 @@ const crypto = require("crypto");
 const Appointment = require("../../models/Appointment");
 const Service = require("../../models/Service");
 
-// -------------------- ROUTES -------------------- //
-
 // CREATE APPOINTMENT
 router.post("/create", async (req, res) => {
   try {
     console.log("📝 Create appointment request body:", req.body);
     let { patientId, doctorId, serviceId, date, startTime, durationMinutes, endTime, price } = req.body;
 
-    if (!patientId || !doctorId || !serviceId || !date || !startTime) {
+    if (!patientId || !doctorId || !date || !startTime) {
       return res.status(400).json({
         status: "error",
-        error: "Missing required fields: patientId, doctorId, serviceId, date, startTime"
+        error: "Missing required fields: patientId, doctorId, date, startTime"
       });
     }
 
-    const service = await Service.findById(serviceId);
-    if (!service) {
-      console.error("Service not found with ID:", serviceId);
-      return res.status(404).json({ status: "error", error: "Service not found" });
+    // serviceId is optional — only look up service if provided
+    let service = null;
+    if (serviceId) {
+      service = await Service.findById(serviceId);
+      if (!service) {
+        console.warn("Service not found with ID:", serviceId, "— continuing without it");
+      }
     }
 
-    // Use provided duration or fallback to service duration or default 30
     if (!durationMinutes) {
-      durationMinutes = service.durationMinutes || 30;
-      console.log(`Using duration: ${durationMinutes} minutes (from service or default)`);
+      durationMinutes = service?.durationMinutes || 30;
     }
 
-    price = price || service.price || 1;
+    price = price || service?.price || 1;
 
-    // Calculate endTime if missing
     if (!endTime && startTime && durationMinutes) {
-      const [hours, minutes] = startTime.split(":").map(Number);
-      const startDate = new Date(`${date}T${startTime}:00`); // better date parsing
+      const startDate = new Date(`${date}T${startTime}:00`);
       const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
-      endTime = endDate.toTimeString().slice(0, 5); // HH:MM
+      endTime = endDate.toTimeString().slice(0, 5);
     }
 
     const roomId = crypto.randomBytes(16).toString("hex");
@@ -46,7 +43,7 @@ router.post("/create", async (req, res) => {
     const appointment = new Appointment({
       patientId,
       doctorId,
-      serviceId,
+      ...(serviceId && { serviceId }),
       date,
       startTime,
       endTime,
@@ -71,7 +68,7 @@ router.get("/doctor/:doctorId", async (req, res) => {
   try {
     const appointments = await Appointment.find({ doctorId: req.params.doctorId })
       .populate("patientId", "name email")
-      .populate("serviceId", "title durationMinutes")
+      .populate({ path: "serviceId", select: "title durationMinutes", strictPopulate: false })
       .sort({ createdAt: -1 });
 
     res.json({ status: "success", appointments });
@@ -86,7 +83,7 @@ router.get("/patient/:patientId", async (req, res) => {
   try {
     const appointments = await Appointment.find({ patientId: req.params.patientId })
       .populate("doctorId", "name")
-      .populate("serviceId", "title")
+      .populate({ path: "serviceId", select: "title", strictPopulate: false })
       .sort({ createdAt: -1 });
 
     res.json({ status: "success", appointments });
@@ -96,13 +93,13 @@ router.get("/patient/:patientId", async (req, res) => {
   }
 });
 
-// GET SINGLE APPOINTMENT (for consultation)
+// GET SINGLE APPOINTMENT
 router.get("/:id", async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id)
       .populate("patientId", "name email")
       .populate("doctorId", "name")
-      .populate("serviceId", "title");
+      .populate({ path: "serviceId", select: "title", strictPopulate: false });
 
     if (!appointment) {
       return res.status(404).json({ status: "error", error: "Appointment not found" });
@@ -115,7 +112,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// CONFIRM PAYMENT / PAY APPOINTMENT
+// PAY APPOINTMENT
 router.put("/pay/:id", async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id);
