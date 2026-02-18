@@ -61,8 +61,20 @@ export default function PatientLabsImaging({ patientId, labs, imaging, onUpdate 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ fontSize: 16, fontWeight: 600 }}>Labs & Imaging</h3>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button variant="primary" size="sm" onClick={() => setShowLabForm(true)}>🧪 Order Lab</Button>
-          <Button variant="primary" size="sm" onClick={() => setShowImagingForm(true)}>📷 Order Imaging</Button>
+          <Button
+            variant="primary"
+            style={{ padding: '4px 12px', fontSize: 12 }}
+            onClick={() => setShowLabForm(true)}
+          >
+            🧪 Order Lab
+          </Button>
+          <Button
+            variant="primary"
+            style={{ padding: '4px 12px', fontSize: 12 }}
+            onClick={() => setShowImagingForm(true)}
+          >
+            📷 Order Imaging
+          </Button>
         </div>
       </div>
 

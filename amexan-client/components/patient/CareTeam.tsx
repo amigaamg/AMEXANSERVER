@@ -34,7 +34,7 @@ export default function CareTeam({ members }: CareTeamProps) {
                 <div style={{ fontWeight: 600 }}>Dr. {m.name}</div>
                 <div style={{ fontSize: 13, color: '#64748b' }}>{m.role} • {m.specialty}</div>
               </div>
-              <Button variant="outline" size="sm">💬</Button>
+              <Button variant="outline" style={{ padding: '4px 10px', fontSize: 14 }}>💬</Button>
             </div>
           ))}
         </div>

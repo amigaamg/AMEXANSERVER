@@ -23,19 +23,17 @@ import QRModal from '@/components/patient/QRModal';
 import LogBPModal from '@/components/patient/LogBPModal';
 import BookingModal from '@/components/patient/BookingModal';
 import EmergencyModal from '@/components/patient/EmergencyModal';
+import type { CareTeamMember } from '@/types/patient';
 
 export default function PatientDashboard() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
-  // Debug logs
   console.log('PatientDashboard - authLoading:', authLoading, 'user:', user);
 
-  // Get patient ID from user object – handle both _id and id
   const patientId = user?._id || user?.id || '';
   console.log('PatientDashboard - patientId:', patientId);
 
-  // Always call hooks, even if user is null
   const db = usePatientData(patientId);
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -44,7 +42,6 @@ export default function PatientDashboard() {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
 
-  // Authentication loading
   if (authLoading) {
     return (
       <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -56,14 +53,12 @@ export default function PatientDashboard() {
     );
   }
 
-  // Not logged in
   if (!user) {
     console.log('PatientDashboard - no user, redirecting to login');
     router.push('/login');
     return null;
   }
 
-  // Data loading
   if (db.loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -75,7 +70,6 @@ export default function PatientDashboard() {
     );
   }
 
-  // No patient data – session expired or error
   if (!db.patient) {
     console.log('PatientDashboard - db.patient is null, error:', db.error);
     return (
@@ -91,9 +85,32 @@ export default function PatientDashboard() {
   }
 
   const unreadMsgs = db.messages.filter(m => !m.read).length;
-  const criticalAlerts = db.alerts.filter(a => a.severity === 'critical').length;
+  // Cast severity to string to support 'critical' values from the API
+  const criticalAlerts = db.alerts.filter(a => (a.severity as string) === 'critical').length;
 
-  const tabs = [
+  // Prefer careTeam stored on the patient record; fall back to deriving from appointments.
+  // Appointment has no specialty field, so we leave it blank when falling back.
+  const careTeamMembers: CareTeamMember[] =
+    db.patient.careTeam && db.patient.careTeam.length > 0
+      ? db.patient.careTeam
+      : Array.from(
+          new Map(
+            db.appointments
+              .filter(a => a.doctorId && a.doctorName)
+              .map(a => [
+                a.doctorId,
+                {
+                  _id: a.doctorId,
+                  name: a.doctorName ?? '',
+                  role: 'Doctor',
+                  specialty: '',
+                  avatar: '',
+                } as CareTeamMember,
+              ])
+          ).values()
+        );
+
+  const tabs: { id: string; label: string; icon: string; badge?: number }[] = [
     { id: 'overview', label: 'Overview', icon: '🏠' },
     { id: 'vitals', label: 'Vitals', icon: '❤️' },
     { id: 'medications', label: 'Meds', icon: '💊' },
@@ -159,7 +176,7 @@ export default function PatientDashboard() {
             >
               <span>{tab.icon}</span>
               {tab.label}
-              {tab.badge > 0 && (
+              {tab.badge !== undefined && tab.badge > 0 && (
                 <span style={{ background: '#ef4444', color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
                   {tab.badge}
                 </span>
@@ -174,7 +191,7 @@ export default function PatientDashboard() {
         {activeTab === 'overview' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
             <HealthSnapshot
-              latestBP={db.measurements.filter(m => m.type === 'bp').sort((a,b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())[0]}
+              latestBP={db.measurements.filter(m => m.type === 'bp').sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())[0]}
               bpHistory={db.measurements.filter(m => m.type === 'bp')}
               onLogBP={() => setShowBPModal(true)}
             />
@@ -188,8 +205,11 @@ export default function PatientDashboard() {
 
         {activeTab === 'vitals' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-            <HealthSnapshot latestBP={db.measurements.find(m => m.type === 'bp')} bpHistory={db.measurements.filter(m => m.type === 'bp')} onLogBP={() => setShowBPModal(true)} />
-            {/* Add BP history table here if needed */}
+            <HealthSnapshot
+              latestBP={db.measurements.find(m => m.type === 'bp')}
+              bpHistory={db.measurements.filter(m => m.type === 'bp')}
+              onLogBP={() => setShowBPModal(true)}
+            />
           </div>
         )}
 
@@ -200,7 +220,7 @@ export default function PatientDashboard() {
         {activeTab === 'appointments' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 20 }}>
             <AppointmentsList appointments={db.appointments} onBook={() => setShowBookingModal(true)} expanded />
-            <CareTeam patientId={patientId} appointments={db.appointments} />
+            <CareTeam members={careTeamMembers} />
           </div>
         )}
 
@@ -268,7 +288,7 @@ export default function PatientDashboard() {
           >
             <span style={{ fontSize: 20 }}>{item.icon}</span>
             <span>{item.label}</span>
-            {item.badge > 0 && (
+            {item.badge !== undefined && item.badge > 0 && (
               <span style={{ position: 'absolute', top: 2, right: '20%', background: '#ef4444', color: 'white', borderRadius: '50%', width: 14, height: 14, fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {item.badge}
               </span>

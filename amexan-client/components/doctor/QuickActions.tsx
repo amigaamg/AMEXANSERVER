@@ -5,7 +5,7 @@ interface QuickActionsProps {
 }
 
 export default function QuickActions({ floating }: QuickActionsProps) {
-  const containerStyle = floating
+  const containerStyle: React.CSSProperties = floating
     ? {
         position: 'fixed',
         bottom: 80,
@@ -15,7 +15,11 @@ export default function QuickActions({ floating }: QuickActionsProps) {
         gap: 10,
         zIndex: 50,
       }
-    : { display: 'flex', flexDirection: 'column', gap: 10 };
+    : {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      };
 
   return (
     <div style={containerStyle}>

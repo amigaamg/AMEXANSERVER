@@ -46,7 +46,13 @@ export default function PatientMessages({ patientId, messages, onUpdate }: Patie
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ fontSize: 16, fontWeight: 600 }}>Messages</h3>
-        <Button variant="primary" size="sm" onClick={() => setCompose(true)}>+ Compose</Button>
+        <Button
+          variant="primary"
+          style={{ padding: '4px 12px', fontSize: 12 }}
+          onClick={() => setCompose(true)}
+        >
+          + Compose
+        </Button>
       </div>
 
       {compose && (

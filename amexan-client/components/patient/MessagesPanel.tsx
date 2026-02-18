@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import Pill from '@/components/common/Pill';
 import { api } from '@/lib/utils/api';
 import { timeAgo } from '@/lib/utils/date';
 import type { Message } from '@/types/patient';
@@ -53,9 +54,15 @@ export default function MessagesPanel({ messages, patientId, onUpdate, compact, 
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Secure Messages</h3>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {unread > 0 && <Pill color="#2563eb" bg="#eff6ff">{unread} new</Pill>}
-          <Button variant="outline" size="sm" onClick={() => setCompose(true)}>+ Compose</Button>
+          <Button
+            variant="outline"
+            style={{ padding: '4px 12px', fontSize: 12 }}
+            onClick={() => setCompose(true)}
+          >
+            + Compose
+          </Button>
         </div>
       </div>
 

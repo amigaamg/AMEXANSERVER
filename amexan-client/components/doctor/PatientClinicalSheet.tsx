@@ -43,19 +43,31 @@ export default function PatientClinicalSheet({ visits, labs, messages, expanded 
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>
-                    {item.type === 'visit' ? `Visit – ${item.clinicName}` : item.type === 'lab' ? `Lab: ${item.name}` : `Message from ${item.from}`}
+                    {item.type === 'visit'
+                      ? `Visit – ${item.clinicName}`
+                      : item.type === 'lab'
+                      ? `Lab: ${item.name}`
+                      : `Message from ${item.from}`}
                   </span>
                   <span style={{ fontSize: 12, color: '#94a3b8' }}>{formatDate(item.date)}</span>
                 </div>
                 <div style={{ fontSize: 13, color: '#64748b' }}>
-                  {item.type === 'visit' ? item.diagnosis : item.type === 'lab' ? `${item.value} ${item.unit}` : item.preview}
+                  {item.type === 'visit'
+                    ? item.diagnosis
+                    : item.type === 'lab'
+                    ? `${item.value} ${item.unit}`
+                    : item.preview}
                 </div>
               </div>
             </div>
             {expandedId === item._id && (
               <div style={{ marginTop: 8, padding: 12, background: '#f8fafc', borderRadius: 8 }}>
                 <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>{JSON.stringify(item, null, 2)}</pre>
-                {item.type === 'visit' && <Button variant="outline" size="sm" style={{ marginTop: 8 }}>Add Note</Button>}
+                {item.type === 'visit' && (
+                  <Button variant="outline" style={{ marginTop: 8, padding: '4px 12px', fontSize: 12 }}>
+                    Add Note
+                  </Button>
+                )}
               </div>
             )}
           </div>

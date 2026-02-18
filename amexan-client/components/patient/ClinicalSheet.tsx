@@ -14,7 +14,6 @@ interface ClinicalSheetProps {
 export default function ClinicalSheet({ visits, labs, messages, expanded }: ClinicalSheetProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Combine all events into a timeline
   const timeline = [
     ...visits.map(v => ({ ...v, type: 'visit' as const, date: v.date })),
     ...labs.map(l => ({ ...l, type: 'lab' as const, date: l.date })),
@@ -76,7 +75,9 @@ export default function ClinicalSheet({ visits, labs, messages, expanded }: Clin
                 <pre style={{ fontSize: 13, whiteSpace: 'pre-wrap', color: '#1e293b' }}>
                   {JSON.stringify(item, null, 2)}
                 </pre>
-                <Button variant="outline" size="sm" style={{ marginTop: 8 }}>📄 Download</Button>
+                <Button variant="outline" style={{ marginTop: 8, padding: '4px 12px', fontSize: 12 }}>
+                  📄 Download
+                </Button>
               </div>
             )}
           </div>

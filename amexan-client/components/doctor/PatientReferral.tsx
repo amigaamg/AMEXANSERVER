@@ -10,10 +10,16 @@ interface PatientReferralProps {
   onCancel: () => void;
 }
 
+interface Doctor {
+  _id: string;
+  name: string;
+  specialty: string;
+}
+
 export default function PatientReferral({ patientId, onSuccess, onCancel }: PatientReferralProps) {
   const [doctorSearch, setDoctorSearch] = useState('');
-  const [doctors, setDoctors] = useState([]);
-  const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [reason, setReason] = useState('');
   const [priority, setPriority] = useState('routine');
   const [sending, setSending] = useState(false);

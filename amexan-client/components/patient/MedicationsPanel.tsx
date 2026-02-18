@@ -64,7 +64,7 @@ export default function MedicationsPanel({ medications, patientId, onUpdate, exp
           return (
             <div key={med._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
               <div
-                onClick={() => toggleTaken(med._id, isTaken)}
+                onClick={() => toggleTaken(med._id, isTaken ?? false)}
                 style={{
                   width: 28,
                   height: 28,
@@ -92,7 +92,7 @@ export default function MedicationsPanel({ medications, patientId, onUpdate, exp
               )}
               <Button
                 variant="text"
-                size="sm"
+                style={{ padding: '4px 8px', fontSize: 12 }}
                 onClick={() => requestRefill(med._id)}
                 disabled={requestingRefill === med._id}
               >

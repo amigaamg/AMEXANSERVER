@@ -11,10 +11,16 @@ interface AppointmentTransferProps {
   onSuccess: () => void;
 }
 
+interface Doctor {
+  _id: string;
+  name: string;
+  specialty: string;
+}
+
 export default function AppointmentTransfer({ appointmentId, patientId, onClose, onSuccess }: AppointmentTransferProps) {
   const [doctorSearch, setDoctorSearch] = useState('');
-  const [doctors, setDoctors] = useState([]);
-  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [reason, setReason] = useState('');
   const [refund, setRefund] = useState(false);
   const [loading, setLoading] = useState(false);

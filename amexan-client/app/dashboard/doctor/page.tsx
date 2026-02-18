@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/utils/api';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
-import Pill from '@/components/common/Pill';
 import TodayAppointments from '@/components/doctor/TodayAppointments';
 import PatientList from '@/components/doctor/PatientList';
 import AlertItem from '@/components/doctor/AlertItem';
@@ -17,44 +16,89 @@ export default function DoctorDashboard() {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState('overview');
-  const [appointments, setAppointments] = useState([]);
-  const [patients, setPatients] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [patients, setPatients] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Redirect if not authenticated or not a doctor
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'doctor')) {
       router.push('/login');
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, router]);
 
+  // Fetch dashboard data
   useEffect(() => {
     if (!user) return;
+    const doctorId = user._id || user.id;
+    if (!doctorId) {
+      setError('Invalid doctor ID');
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
+        setLoading(true);
+        setError(null);
         const [aptRes, patientRes, alertRes] = await Promise.all([
-          api(`/api/doctors/${user.id}/appointments/today`),
-          api(`/api/doctors/${user.id}/patients`),
-          api(`/api/doctors/${user.id}/alerts`), // endpoint to fetch alerts for this doctor's patients
+          api(`/api/doctors/${doctorId}/appointments/today`),
+          api(`/api/doctors/${doctorId}/patients`),
+          api(`/api/doctors/${doctorId}/alerts`),
         ]);
-        setAppointments(aptRes);
-        setPatients(patientRes);
-        setAlerts(alertRes);
-      } catch (err) {
-        console.error(err);
+        setAppointments(aptRes || []);
+        setPatients(patientRes || []);
+        setAlerts(alertRes || []);
+      } catch (err: any) {
+        console.error('Dashboard fetch error:', err);
+        setError(err.message || 'Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [user]);
 
-  if (authLoading || loading) {
-    return <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div>Loading dashboard...</div>
-    </div>;
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 48, height: 48, border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+          <p style={{ color: '#64748b' }}>Checking authentication…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 48, height: 48, border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+          <p style={{ color: '#64748b' }}>Loading dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Card style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>Error</h2>
+          <p style={{ color: '#64748b', marginBottom: 16 }}>{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </Card>
+      </div>
+    );
   }
 
   const tabs = [
@@ -103,11 +147,12 @@ export default function DoctorDashboard() {
                 alignItems: 'center',
                 gap: 6,
                 borderBottom: activeTab === tab.id ? '2px solid #2563eb' : '2px solid transparent',
+                transition: 'all 0.15s',
               }}
             >
               <span>{tab.icon}</span>
               {tab.label}
-              {tab.badge > 0 && (
+              {tab.badge !== undefined && tab.badge > 0 && (
                 <span style={{ background: '#ef4444', color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
                   {tab.badge}
                 </span>
@@ -146,11 +191,13 @@ export default function DoctorDashboard() {
           </div>
         )}
         {activeTab === 'messages' && (
-          <div>Messages view (similar to patient but from doctor perspective)</div>
+          <Card style={{ padding: 24, textAlign: 'center' }}>
+            <p style={{ color: '#94a3b8' }}>Messages feature coming soon.</p>
+          </Card>
         )}
       </div>
 
-      {/* Floating action buttons (optional) */}
+      {/* Floating action buttons */}
       <QuickActions floating />
     </div>
   );

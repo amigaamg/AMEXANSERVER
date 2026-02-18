@@ -5,13 +5,26 @@ import Pill from '@/components/common/Pill';
 import PatientDetailModal from './PatientDetailModal';
 import { formatTime } from '@/lib/utils/date';
 
+interface Patient {
+  _id: string;
+  name: string;
+}
+
+interface Appointment {
+  _id: string;
+  patientId?: Patient;
+  clinicType: string;
+  date: string;
+  isFirstVisit?: boolean;
+}
+
 interface TodayAppointmentsProps {
-  appointments: any[];
+  appointments: Appointment[];
   expanded?: boolean;
 }
 
 export default function TodayAppointments({ appointments, expanded }: TodayAppointmentsProps) {
-  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   if (!appointments.length) {
     return (
@@ -39,15 +52,13 @@ export default function TodayAppointments({ appointments, expanded }: TodayAppoi
                 <div style={{ fontSize: 13, color: '#2563eb' }}>{apt.clinicType}</div>
                 <div style={{ fontSize: 12, color: '#64748b' }}>Time: {formatTime(apt.date)}</div>
               </div>
-              <div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setSelectedPatient(apt.patientId)}
-                >
-                  Start
-                </Button>
-              </div>
+              <Button
+                variant="primary"
+                style={{ padding: '4px 12px', fontSize: 12 }}
+                onClick={() => apt.patientId && setSelectedPatient(apt.patientId)}
+              >
+                Start
+              </Button>
             </div>
           </div>
         ))}

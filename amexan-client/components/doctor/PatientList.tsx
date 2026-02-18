@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
-import Button from '@/components/common/Button';
 import PatientDetailModal from './PatientDetailModal';
+import type { Patient } from '@/types/patient';
 
-export default function PatientList({ patients }) {
+interface PatientListProps {
+  patients: Patient[];
+}
+
+export default function PatientList({ patients }: PatientListProps) {
   const [search, setSearch] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   const filtered = patients.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||

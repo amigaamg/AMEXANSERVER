@@ -1,39 +1,57 @@
 import Button from '@/components/common/Button';
-import { timeAgo } from '@/lib/utils/date';
-import type { Alert } from '@/types/patient';
+
+interface Alert {
+  _id: string;
+  severity: 'low' | 'medium' | 'high';
+  title: string;
+  message: string;
+  action?: string;
+  createdAt: string;
+  isRead: boolean;
+}
 
 interface AlertItemProps {
   alert: Alert;
-  onMarkRead?: (id: string) => void;
-  onClick?: () => void;
 }
 
-export default function AlertItem({ alert, onMarkRead, onClick }: AlertItemProps) {
-  const severityStyle = {
-    high: { border: '#ef4444', bg: '#fef2f2', color: '#ef4444' },
-    medium: { border: '#f59e0b', bg: '#fffbeb', color: '#f59e0b' },
-    low: { border: '#2563eb', bg: '#eff6ff', color: '#2563eb' },
-  }[alert.severity];
+const severityColors: Record<string, { bg: string; color: string; border: string }> = {
+  low:    { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
+  medium: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
+  high:   { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+};
+
+export default function AlertItem({ alert }: AlertItemProps) {
+  const colors = severityColors[alert.severity] ?? severityColors.low;
 
   return (
-    <div
-      onClick={onClick}
-      style={{
-        padding: 12,
-        background: severityStyle.bg,
-        borderLeft: `4px solid ${severityStyle.border}`,
-        borderRadius: 8,
-        cursor: onClick ? 'pointer' : 'default',
-        marginBottom: 8,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontWeight: 700, fontSize: 14, color: severityStyle.color }}>{alert.title}</span>
-        <span style={{ fontSize: 11, color: '#64748b' }}>{timeAgo(alert.createdAt)}</span>
+    <div style={{
+      background: colors.bg,
+      border: `1px solid ${colors.border}`,
+      borderRadius: 10,
+      padding: '12px 14px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{
+          background: colors.color,
+          color: 'white',
+          borderRadius: 6,
+          padding: '2px 8px',
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+        }}>
+          {alert.severity}
+        </span>
+        <span style={{ fontWeight: 600, fontSize: 14, color: '#1e293b' }}>{alert.title}</span>
       </div>
       <p style={{ fontSize: 13, color: '#1e293b', marginTop: 4 }}>{alert.message}</p>
       {alert.action && (
-        <Button variant="outline" size="sm" style={{ marginTop: 8 }}>{alert.action}</Button>
+        <Button
+          variant="outline"
+          style={{ marginTop: 8, padding: '4px 12px', fontSize: 12 }}
+        >
+          {alert.action}
+        </Button>
       )}
     </div>
   );

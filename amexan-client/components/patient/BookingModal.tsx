@@ -39,8 +39,9 @@ export default function BookingModal({ open, onClose, patientId, onBooked, servi
         method: 'POST',
         body: JSON.stringify({
           patientId,
-          doctorId: selectedService.doctorId,
           clinicId: selectedService._id,
+          clinicName: selectedService.name,
+          specialty: selectedService.specialty,
           date,
           time,
           reason,

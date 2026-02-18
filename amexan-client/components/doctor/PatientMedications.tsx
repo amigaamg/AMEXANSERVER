@@ -39,7 +39,13 @@ export default function PatientMedications({ patientId, medications, onUpdate }:
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ fontSize: 16, fontWeight: 600 }}>Medications</h3>
-        <Button variant="primary" size="sm" onClick={() => setShowPrescribe(true)}>+ Prescribe</Button>
+        <Button
+          variant="primary"
+          style={{ padding: '4px 12px', fontSize: 12 }}
+          onClick={() => setShowPrescribe(true)}
+        >
+          + Prescribe
+        </Button>
       </div>
 
       {showPrescribe && (

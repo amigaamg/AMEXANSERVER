@@ -12,8 +12,8 @@ interface LabsImagingPanelProps {
 
 export default function LabsImagingPanel({ labs, imaging, expanded }: LabsImagingPanelProps) {
   const statusStyles = {
-    normal: { color: '#22c55e', bg: '#f0fdf4' },
-    warning: { color: '#f59e0b', bg: '#fffbeb' },
+    normal:   { color: '#22c55e', bg: '#f0fdf4' },
+    warning:  { color: '#f59e0b', bg: '#fffbeb' },
     critical: { color: '#ef4444', bg: '#fef2f2' },
   };
 
@@ -59,17 +59,28 @@ export default function LabsImagingPanel({ labs, imaging, expanded }: LabsImagin
             {imaging.slice(0, expanded ? undefined : 4).map(img => (
               <div key={img._id} style={{ background: '#f8fafc', borderRadius: 12, padding: 12, border: '1px solid #e2e8f0' }}>
                 {img.thumbnailUrl && (
-                  <img src={img.thumbnailUrl} alt={img.type} style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }} />
+                  <img
+                    src={img.thumbnailUrl}
+                    alt={img.type}
+                    style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }}
+                  />
                 )}
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{img.type}</div>
                 <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{formatDate(img.date)}</div>
                 <div style={{ marginTop: 8 }}>
-                  <Pill color={img.status === 'completed' ? '#22c55e' : '#f59e0b'} bg={img.status === 'completed' ? '#f0fdf4' : '#fffbeb'}>
+                  <Pill
+                    color={img.status === 'completed' ? '#22c55e' : '#f59e0b'}
+                    bg={img.status === 'completed' ? '#f0fdf4' : '#fffbeb'}
+                  >
                     {img.status}
                   </Pill>
                 </div>
                 {img.fullUrl && (
-                  <Button variant="outline" size="sm" style={{ marginTop: 8, width: '100%' }} onClick={() => window.open(img.fullUrl, '_blank')}>
+                  <Button
+                    variant="outline"
+                    style={{ marginTop: 8, width: '100%', padding: '4px 12px', fontSize: 12 }}
+                    onClick={() => window.open(img.fullUrl!, '_blank')}
+                  >
                     View
                   </Button>
                 )}
