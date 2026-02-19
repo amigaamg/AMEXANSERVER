@@ -11,13 +11,12 @@ export default function MedicalHistory({ patientId }: MedicalHistoryProps) {
   const [history, setHistory] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api(`/api/patients/${patientId}/history`)
-      .then(data => setHistory(data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [patientId]);
-
+ useEffect(() => {
+  api.get(`/patients/${patientId}/history`)
+    .then(data => setHistory(Array.isArray(data) ? data : []))
+    .catch(console.error)
+    .finally(() => setLoading(false));
+}, [patientId]);
   if (loading) return <Card><div>Loading history...</div></Card>;
 
   return (
